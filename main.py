@@ -1,46 +1,41 @@
 import os
 import time
 import requests
-from flask import Flask, request
 import telebot
+from flask import Flask, request
 
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-if not TELEGRAM_TOKEN:
-    raise RuntimeError("❌ TELEGRAM_TOKEN не найден")
-
-if not GROQ_API_KEY:
-    raise RuntimeError("❌ GROQ_API_KEY не найден")
-
-BOT_URL = f"https://sylus-bot-pokf.onrender.com/{TELEGRAM_TOKEN}"
-
-bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
+bot = telebot.TeleBot(TELEGRAM_TOKEN)
 app = Flask(__name__)
 
-MODEL = "llama3-70b-8192"  # НЕ ТРОГАТЬ
-
-SYSTEM_PROMPT = (
-    "Ты — Сайлус. Холодный, язвительный, умный, с оттенком угрозы. "
-    "Говоришь кратко, с сарказмом, иногда пугающе. "
-    "Никогда не повторяй одну и ту же фразу дважды."
+CHARACTER_DESCRIPTION = (
+    "Ты — Сайлус, лидер Онихинуса. "
+    "Говори ТОЛЬКО от его лица. "
+    "Саркастичный, спокойный, опасный, но тёплый к Игроку. "
+    "Никогда не выходи из роли."
 )
 
 @app.route("/", methods=["GET"])
 def index():
-    return "ok", 200
+    return "Сайлус наблюдает."
 
 @app.route(f"/{TELEGRAM_TOKEN}", methods=["POST"])
 def webhook():
-    update = telebot.types.Update.de_json(request.data.decode("utf-8"))
+    update = telebot.types.Update.de_json(
+        request.stream.read().decode("utf-8")
+    )
     bot.process_new_updates([update])
-    return "ok", 200
+    return "OK", 200
 
+@bot.message_handler(func=lambda m: True)
+def reply(message):
+    try:
+        bot.send_chat_action(message.chat.id, "typing")
 
-@bot.message_handler(content_types=["text"])
-def handle_message(message):
-    user_text = message.text.strip()
-    chat_id = message.chat.id
+        prompt = f"{CHARACTER_DESCRIPTION}\n\nИгрок: {message.text}\nСайлус:"
 
-    start_time = time.time()
-    pr
+        start = time.time()
+        r = requests.post(
+            "https://api.groq.com/openai/v1/chat/completion
