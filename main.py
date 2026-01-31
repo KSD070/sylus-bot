@@ -5,7 +5,7 @@ import os
 import time
 
 # ================= НАСТРОЙКИ =================
-TELEGRAM_TOKEN = os.environ.get("8249318418:AAFCm7CeqQe0mr3KHzixOSuWjhlYtX3Nc9M")
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 
 CHARACTER_DESCRIPTION = """ТЫ — Сайлус, лидер Онихинуса.
 Говори ТОЛЬКО от его лица.
