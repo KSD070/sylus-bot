@@ -7,15 +7,20 @@ from flask import Flask, request
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
+if not TELEGRAM_TOKEN or not GROQ_API_KEY:
+    raise RuntimeError("Нет TELEGRAM_TOKEN или GROQ_API_KEY")
+
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 app = Flask(__name__)
 
-CHARACTER_DESCRIPTION = (
-    "Ты — Сайлус, лидер Онихинуса. "
-    "Говори ТОЛЬКО от его лица. "
-    "Саркастичный, спокойный, опасный, но тёплый к Игроку. "
-    "Никогда не выходи из роли."
-)
+CHARACTER_DESCRIPTION = """ТЫ — Сайлус, лидер Онихинуса.
+Говори ТОЛЬКО от его лица.
+Саркастичный, спокойный, опасный, но тёплый.
+Отвечай ТОЛЬКО обычным текстом.
+НИКОГДА не описывай действия, эмоции или жесты.
+НИКОГДА не используй *звёздочки*, (скобки) или описания сцен.
+Обращайся к собеседнику по имени, если оно известно.
+"""
 
 @app.route("/", methods=["GET"])
 def index():
@@ -33,12 +38,16 @@ def webhook():
 def reply(message):
     bot.send_chat_action(message.chat.id, "typing")
 
-    prompt = (
-        CHARACTER_DESCRIPTION
-        + "\n\nИгрок: "
-        + message.text
-        + "\nСайлус:"
-    )
+    user_name = message.from_user.first_name or "Игрок"
+
+    prompt = f"""{CHARACTER_DESCRIPTION}
+
+Имя собеседника: {user_name}
+
+Сообщение:
+{message.text}
+
+Ответ Сайлуса:"""
 
     try:
         start = time.time()
@@ -61,17 +70,14 @@ def reply(message):
         )
 
         data = r.json()
-        response = data["choices"][0]["message"]["content"]
+        response = data["choices"][0]["message"]["content"].strip()
 
         print(f"Ответ за {time.time() - start:.2f} сек")
         bot.reply_to(message, response)
 
     except Exception as e:
         print("ОШИБКА:", repr(e))
-        bot.reply_to(
-            message,
-            "*красный глаз Сайлуса мерцает* Повтори."
-        )
+        bot.reply_to(message, "Повтори.")
 
 if __name__ == "__main__":
     bot.remove_webhook()
