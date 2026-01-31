@@ -1,30 +1,32 @@
-import telebot
-from transformers import pipeline
-from flask import Flask, request
 import os
 import time
+import telebot
+from flask import Flask, request
+from openai import OpenAI
 
-# ===== НАСТРОЙКИ =====
+# ================= НАСТРОЙКИ =================
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-if not TELEGRAM_TOKEN:
-    raise RuntimeError("TELEGRAM_TOKEN не задан")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
-CHARACTER_DESCRIPTION = """ТЫ — Сайлус, лидер Онихинуса.
+if not TELEGRAM_TOKEN or not GROQ_API_KEY:
+    raise RuntimeError("Не заданы TELEGRAM_TOKEN или GROQ_API_KEY")
+
+CHARACTER_SYSTEM_PROMPT = """
+Ты — Сайлус, лидер Онихинуса.
 Говори ТОЛЬКО от его лица.
-Саркастичный, спокойный, опасный, но тёплый к Игроку.
+Характер: саркастичный, спокойный, опасный, но тёплый к Игроку.
+Ты не ИИ, не ассистент, не бот.
 Никогда не выходи из роли.
+Отвечай коротко, уверенно, с подтекстом.
 """
 
-MODEL_NAME = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-# ====================
+MODEL = "llama3-8b-8192"  # работает бесплатно у Groq
+# =============================================
 
-print("Загружаю модель...")
-generator = pipeline(
-    "text-generation",
-    model=MODEL_NAME,
-    max_new_tokens=120
+client = OpenAI(
+    api_key=GROQ_API_KEY,
+    base_url="https://api.groq.com/openai/v1"
 )
-print("Модель загружена")
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 app = Flask(__name__)
@@ -44,18 +46,27 @@ def webhook():
 def reply(message):
     bot.send_chat_action(message.chat.id, "typing")
 
-    prompt = f"""{CHARACTER_DESCRIPTION}
-
-Человек: {message.text}
-Сайлус:"""
-
     try:
-        result = generator(prompt)[0]["generated_text"]
-        response = result.split("Сайлус:")[-1].strip()
-        bot.reply_to(message, response[:500])
+        start = time.time()
+
+        completion = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": CHARACTER_SYSTEM_PROMPT},
+                {"role": "user", "content": message.text}
+            ],
+            temperature=0.9,
+            max_tokens=200,
+        )
+
+        response = completion.choices[0].message.content.strip()
+
+        print(f"Ответ за {time.time() - start:.1f} сек")
+        bot.reply_to(message, response)
+
     except Exception as e:
         print("ОШИБКА:", e)
-        bot.reply_to(message, "…")
+        bot.reply_to(message, "*красный глаз Сайлуса мерцает* Скажи ещё раз.")
 
 if __name__ == "__main__":
     bot.remove_webhook()
