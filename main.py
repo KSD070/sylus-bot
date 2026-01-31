@@ -4,8 +4,10 @@ from flask import Flask, request
 import os
 import time
 
-# ================= НАСТРОЙКИ =================
+# ===== НАСТРОЙКИ =====
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+if not TELEGRAM_TOKEN:
+    raise RuntimeError("TELEGRAM_TOKEN не задан")
 
 CHARACTER_DESCRIPTION = """ТЫ — Сайлус, лидер Онихинуса.
 Говори ТОЛЬКО от его лица.
@@ -14,15 +16,15 @@ CHARACTER_DESCRIPTION = """ТЫ — Сайлус, лидер Онихинуса.
 """
 
 MODEL_NAME = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-# =============================================
+# ====================
 
-print("🔄 Загружаю модель...")
+print("Загружаю модель...")
 generator = pipeline(
     "text-generation",
     model=MODEL_NAME,
     max_new_tokens=120
 )
-print("✅ Модель загружена")
+print("Модель загружена")
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 app = Flask(__name__)
@@ -48,22 +50,19 @@ def reply(message):
 Сайлус:"""
 
     try:
-        start = time.time()
         result = generator(prompt)[0]["generated_text"]
         response = result.split("Сайлус:")[-1].strip()
-
-        if len(response) > 500:
-            response = response[:500] + "…"
-
-        print(f"Ответ за {time.time()-start:.1f} сек")
-
-        bot.reply_to(message, response)
-
+        bot.reply_to(message, response[:500])
     except Exception as e:
         print("ОШИБКА:", e)
-        bot.reply_to(message, "*красный глаз Сайлуса вспыхивает* Повтори.")
+        bot.reply_to(message, "…")
 
 if __name__ == "__main__":
     bot.remove_webhook()
-    bot.set_webhook(url=f"https://YOUR-RENDER-URL.onrender.com/{TELEGRAM_TOKEN}")
-    app.run(host="0.0.0.0", port=10000)
+    bot.set_webhook(
+        url=f"https://sylus-bot.onrender.com/{TELEGRAM_TOKEN}"
+    )
+
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
+
